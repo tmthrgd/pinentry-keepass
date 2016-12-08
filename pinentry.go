@@ -21,6 +21,11 @@ func respondOK(_ string, out io.Writer) (err error) {
 	return
 }
 
+func respondCancelled(_ string, out io.Writer) (err error) {
+	_, err = io.WriteString(out, "ERR Operation cancelled\n")
+	return
+}
+
 func cmdGetInfo(args string, out io.Writer) (err error) {
 	switch args {
 	case "pid":
@@ -52,22 +57,37 @@ type context struct {
 }
 
 func (ctx *context) CmdKeyInfo(args string, out io.Writer) error {
-	ctx.KeyInfo = args
+	if args == "--clear" {
+		ctx.KeyInfo = ""
+	} else {
+		ctx.KeyInfo = args
+	}
+
 	return respondOK(args, out)
 }
 
 func (ctx *context) CmdGetPIN(args string, out io.Writer) (err error) {
 	if len(ctx.KeyInfo) == 0 {
-		_, err = io.WriteString(out, "ERR Operation cancelled\n")
-		return
+		return respondCancelled(args, out)
 	}
 
-	// lookup by: ctx.KeyInfo
-	pass := os.Getenv("PINENTRY_KEEPASS_PASS")
+	var pass string
+
+	switch ctx.KeyInfo[:2] {
+	case "u/", "s/", "n/":
+		keyGrip := ctx.KeyInfo[2:]
+		if len(keyGrip) != 40 {
+			return respondCancelled(args, out)
+		}
+
+		// lookup key by: keyGrip
+		pass = os.Getenv("PINENTRY_KEEPASS_PASS")
+	default:
+		return respondCancelled(args, out)
+	}
 
 	if len(pass) == 0 {
-		_, err = io.WriteString(out, "ERR Operation cancelled\n")
-		return
+		return respondCancelled(args, out)
 	}
 
 	if _, err = fmt.Fprintf(out, "D %s\n", pass); err != nil {
@@ -78,6 +98,7 @@ func (ctx *context) CmdGetPIN(args string, out io.Writer) (err error) {
 }
 
 // https://www.gnupg.org/ftp/gcrypt/pinentry/pinentry-1.0.0.tar.bz2
+// https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-2.1.16.tar.bz2
 // https://github.com/Chronic-Dev/libgpg-error/blob/d555c739a934aa2c8f65f38834c950d3cbb11dab/src/err-codes.h.in
 // http://info2html.sourceforge.net/cgi-bin/info2html-demo/info2html?(pinentry)Protocol
 // https://www.gnupg.org/documentation/manuals/assuan/
