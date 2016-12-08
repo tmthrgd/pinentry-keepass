@@ -67,7 +67,7 @@ func (ctx *context) CmdKeyInfo(args string, out io.Writer) error {
 }
 
 func (ctx *context) CmdGetPIN(args string, out io.Writer) (err error) {
-	if len(ctx.KeyInfo) == 0 {
+	if len(ctx.KeyInfo) < 2 {
 		return respondCancelled(args, out)
 	}
 
